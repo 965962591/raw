@@ -1,0 +1,15 @@
+# 忽略所有的 .raw 文件
+*.raw
+
+# 忽略临时文件
+*.tmp
+
+# 忽略 Python 编译文件
+__pycache__/
+*.pyc
+
+# 忽略虚拟环境
+venv/ 
+
+ImageTools/
+test/
