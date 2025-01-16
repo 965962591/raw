@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def read_raw10(raw_path, width, height, bayer_pattern='GRBG'):
+def read_raw10(raw_path, width, height, bayer_pattern):
     """
     优化后的函数：读取 10 位 MIPI RAW 图像并转换为 RGB 图像。
     
@@ -46,9 +46,9 @@ def read_raw10(raw_path, width, height, bayer_pattern='GRBG'):
         raise ValueError(f"未知的 Bayer 格式: {bayer_pattern}")
 
     # 使用 OpenCV 进行去马赛克处理
-    rgb_image = cv2.cvtColor(raw_image_8bit, conversion_code)
+    rgb_image = cv2.demosaicing(raw_image_8bit, conversion_code)
 
-    # 将图像缩放到原来的0.1倍
+    # 将图像缩放到原来的0.2倍
     scale_factor = 0.2
     rgb_image = cv2.resize(rgb_image, (0, 0), fx=scale_factor, fy=scale_factor)
 
