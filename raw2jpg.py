@@ -1,11 +1,12 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog, QGraphicsView, QSplitter
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSettings
 import cv2
 import numpy as np
 from mipi2raw import convertMipi2Raw, bayer_order_maps
 from PyQt5.QtGui import QPixmap, QImage, QWheelEvent, QPainter
 from PyQt5.QtWidgets import QGraphicsScene
+import json  # 添加 json 模块
 
 class ImageGraphicsView(QGraphicsView):
     def __init__(self, parent=None):
@@ -93,7 +94,7 @@ class Mipi2RawConverterApp(QMainWindow):
         splitter.addWidget(right_widget)
 
         # Set initial sizes for the splitter
-        splitter.setSizes([600, 200])  # Adjust the sizes as needed
+        splitter.setSizes([600, 100])  # Adjust the sizes as needed
 
         # Set main widget
         container = QWidget()
@@ -104,6 +105,42 @@ class Mipi2RawConverterApp(QMainWindow):
 
         # Placeholder for file path
         self.mipi_file_path = None
+
+        # Initialize QSettings
+        self.settings = QSettings("YourCompany", "Mipi2RawConverter")
+
+        # Load previous settings from JSON
+        self.load_settings()
+
+    def load_settings(self):
+        try:
+            with open("raw_settings.json", "r") as file:
+                settings = json.load(file)
+                self.width_input.setText(settings.get("width", ""))
+                self.height_input.setText(settings.get("height", ""))
+                self.bit_depth_combo.setCurrentText(settings.get("bit_depth", "8"))
+                self.bayer_combo.setCurrentText(settings.get("bayer_pattern", "RGGB"))
+                self.mipi_file_path = settings.get("mipi_file_path", None)
+        except FileNotFoundError:
+            # 如果文件不存在，使用默认值
+            self.width_input.setText("")
+            self.height_input.setText("")
+            self.bit_depth_combo.setCurrentText("8")
+            self.bayer_combo.setCurrentText("RGGB")
+            self.mipi_file_path = None
+
+    def closeEvent(self, event):
+        # Save current values to JSON
+        settings = {
+            "width": self.width_input.text(),
+            "height": self.height_input.text(),
+            "bit_depth": self.bit_depth_combo.currentText(),
+            "bayer_pattern": self.bayer_combo.currentText(),
+            "mipi_file_path": self.mipi_file_path
+        }
+        with open("raw_settings.json", "w") as file:
+            json.dump(settings, file, indent=4)
+        super().closeEvent(event)
 
     def load_mipi_raw_file(self):
         # Open file dialog to select MIPI RAW file
