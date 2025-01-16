@@ -1,55 +1,105 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog, QGraphicsView, QSplitter
 from PyQt5.QtCore import Qt
 import cv2
 import numpy as np
 from mipi2raw import convertMipi2Raw, bayer_order_maps
+from PyQt5.QtGui import QPixmap, QImage, QWheelEvent, QPainter
+from PyQt5.QtWidgets import QGraphicsScene
+
+class ImageGraphicsView(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setRenderHint(QPainter.Antialiasing, True)
+        self.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+    def wheelEvent(self, event: QWheelEvent):
+        # Zoom in or out
+        factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
+        self.scale(factor, factor)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.setDragMode(QGraphicsView.NoDrag)
+        super().mouseReleaseEvent(event)
 
 class Mipi2RawConverterApp(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("MIPI to RAW Converter")
-        self.setGeometry(100, 100, 400, 300)
+        self.setGeometry(100, 100, 800, 300)
 
-        # Main layout
-        main_layout = QVBoxLayout()
+        # Main layout using QSplitter
+        splitter = QSplitter(Qt.Horizontal)
 
-        # Load MIPI RAW file button
-        self.load_button = QPushButton("Load MIPI RAW File")
-        self.load_button.clicked.connect(self.load_mipi_raw_file)
-        main_layout.addWidget(self.load_button)
+        # Left layout for image display
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+        self.graphics_view = ImageGraphicsView()
+        left_layout.addWidget(self.graphics_view)
+        left_widget.setLayout(left_layout)
+        splitter.addWidget(left_widget)
 
-        # Width input
-        main_layout.addWidget(QLabel("Width:"))
+        # Right layout for controls
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+
+
+        # Width and Height in the same row
+        size_layout = QHBoxLayout()
+        
+        size_layout.addWidget(QLabel("Width:"))
         self.width_input = QLineEdit()
-        main_layout.addWidget(self.width_input)
+        size_layout.addWidget(self.width_input)
 
-        # Height input
-        main_layout.addWidget(QLabel("Height:"))
+        size_layout.addWidget(QLabel("Height:"))
         self.height_input = QLineEdit()
-        main_layout.addWidget(self.height_input)
+        size_layout.addWidget(self.height_input)
 
-        # Bit depth selection
-        main_layout.addWidget(QLabel("Bit Depth:"))
+        right_layout.addLayout(size_layout)
+
+        # Bit Depth and Bayer Pattern in the same row
+        format_layout = QHBoxLayout()
+
+        format_layout.addWidget(QLabel("Bit Depth:"))
         self.bit_depth_combo = QComboBox()
         self.bit_depth_combo.addItems(["8", "10", "12", "14", "16"])
-        main_layout.addWidget(self.bit_depth_combo)
+        format_layout.addWidget(self.bit_depth_combo)
 
-        # Bayer pattern selection
-        main_layout.addWidget(QLabel("Bayer Pattern:"))
+        format_layout.addWidget(QLabel("Bayer Pattern:"))
         self.bayer_combo = QComboBox()
         self.bayer_combo.addItems(["RGGB", "BGGR", "GRBG", "GBRG"])
-        main_layout.addWidget(self.bayer_combo)
+        format_layout.addWidget(self.bayer_combo)
 
-        # Convert button
+        right_layout.addLayout(format_layout)
+        # Load and Convert buttons in the same row
+        button_layout = QHBoxLayout()
+        self.load_button = QPushButton("Load MIPI RAW File")
+        self.load_button.clicked.connect(self.load_mipi_raw_file)
+        button_layout.addWidget(self.load_button)
+
         self.convert_button = QPushButton("Convert")
         self.convert_button.clicked.connect(self.convert_image)
-        main_layout.addWidget(self.convert_button)
+        button_layout.addWidget(self.convert_button)
+        right_layout.addLayout(button_layout)
+        right_widget.setLayout(right_layout)
+        splitter.addWidget(right_widget)
+
+        # Set initial sizes for the splitter
+        splitter.setSizes([600, 200])  # Adjust the sizes as needed
 
         # Set main widget
         container = QWidget()
-        container.setLayout(main_layout)
+        container_layout = QVBoxLayout()
+        container_layout.addWidget(splitter)
+        container.setLayout(container_layout)
         self.setCentralWidget(container)
 
         # Placeholder for file path
@@ -80,6 +130,27 @@ class Mipi2RawConverterApp(QMainWindow):
 
         # Convert MIPI RAW to image
         convertMipi2Raw(self.mipi_file_path, width, height, bit_depth, bayer_order)
+
+        # Load the converted image
+        jpg_file_path = self.mipi_file_path[:-4] + '_unpack.jpg'
+        self.display_image(jpg_file_path)
+
+    def display_image(self, image_path):
+        # Load image using QImage
+        image = QImage(image_path)
+        if image.isNull():
+            print("Failed to load image:", image_path)
+            return
+
+        # Convert QImage to QPixmap
+        pixmap = QPixmap.fromImage(image)
+
+        # Create a scene and add the pixmap
+        scene = QGraphicsScene()
+        scene.addPixmap(pixmap)
+
+        # Set the scene to the graphics view
+        self.graphics_view.setScene(scene)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
